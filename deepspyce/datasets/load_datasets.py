@@ -21,9 +21,10 @@
 import os
 import pathlib
 
-from deepspyce.io import raw_to_df, read_iar
+from deepspyce.io import read_raw
+from deepspyce.utils.misc import dict_from_file
 
-import pandas as pd
+import numpy as np
 
 # ============================================================================
 # CONSTANTS
@@ -36,39 +37,68 @@ PATH = pathlib.Path(os.path.abspath(os.path.dirname(__file__)))
 # ============================================================================
 
 
-def load_raw_1m(ret_df: bool = True):
-    """Load template raw data file."""
-    path = PATH / "20201027_133329_1m.raw"
+def load_raw_1m() -> np.ndarray:
+    """
+    Template raw_1m data file loader.
 
-    if ret_df:
-        return raw_to_df(path)
-    else:
-        with open(path, "rb") as file:
-            raw = file.read()
-        return raw
+    Loads the template raw_1m data file.
 
+    Parameters
+    ----------
+    raw : bool, default value = False
+        Indicates if the raw data is returned bytes.
 
-def load_raw_test(ret_df: bool = True):
-    """Load template raw_test data file."""
-    path = PATH / "20201027_133329_test.raw"
+    Return
+    ------
+    array : ``numpy.ndarray``
+        Numpy ndarray of the aw_1m file data.
+    """
 
-    if ret_df:
-        return raw_to_df(path)
-    else:
-        with open(path, "rb") as file:
-            raw_test = file.read()
-        return raw_test
+    return read_raw(PATH / "20201027_133329_1m.raw")
 
 
-def load_csv_test() -> pd.DataFrame:
-    """Load template csv_test data file."""
-    path = PATH / "20201027_133329_test.csv"
+def load_raw_test() -> np.ndarray:
+    """
+    Template raw_test data file loader.
 
-    return pd.read_csv(path, dtype=">i8", header=None)
+    Loads the template raw_test data file.
+
+    Return
+    ------
+    array : ``numpy.ndarray``
+        Numpy ndarray of the raw_test file data.
+    """
+
+    return read_raw(PATH / "20201027_133329_test.raw")
+
+
+def load_csv_test() -> np.ndarray:
+    """
+    Template .csv data file loader.
+
+    Loads the template csv_test data file.
+
+    Return
+    ------
+    array : ``numpy.ndarray``
+        Numpy ndarray of the csv_test file data.
+    """
+
+    return np.loadtxt(
+        PATH / "20201027_133329_test.csv", dtype=">i8", delimiter=","
+    )
 
 
 def load_iar() -> dict:
-    """Load template .iar file."""
-    path = PATH / "J0437-4715_1_A1.iar"
+    """
+    Template .iar data file loader.
 
-    return read_iar(path)
+    Loads the template .iar data file as a dict.
+
+    Return
+    ------
+    iar : dict
+        Dictionary of the template iar file.
+    """
+
+    return dict_from_file(PATH / "J0437-4715_1_A1.iar")

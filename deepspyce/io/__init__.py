@@ -11,17 +11,13 @@
 # DOCS
 # ============================================================================
 
-"""The deepspyce.io module provides input/output tools."""
+"""The deepspyce.io module includes I/O tools."""
 
 # =============================================================================
 # IMPORTS
 # =============================================================================
 
-from .filterbank import (  # noqa
-    df_to_filterbank,  # noqa
-    iar_to_fil_header,  # noqa
-    raw_to_filterbank,  # noqa
-)  # noqa
-from .fits import df_to_fits, make_fits_header, raw_to_fits  # noqa
-from .iar import read_iar  # noqa
-from .raw import raw_to_df  # noqa
+# from .fits import fits_header, write_fits  # noqa
+from .iar import read_iar, write_iar  # noqa
+from .filterbank import read_filterbank, read_filterbank_data, read_filterbank_header, write_filterbank  # noqa
+from .raw import read_raw, write_raw  # noqa

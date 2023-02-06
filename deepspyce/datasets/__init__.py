@@ -20,9 +20,9 @@
 # ============================================================================
 
 from .load_datasets import (  # noqa
-    PATH,  # noqa
     load_csv_test,  # noqa
     load_iar,  # noqa
     load_raw_1m,  # noqa
     load_raw_test,  # noqa
+    PATH,  # noqa
 )  # noqa

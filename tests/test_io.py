@@ -24,9 +24,9 @@ from deepspyce.io.filterbank import (
     iar_to_fil_header,
     raw_to_filterbank,
 )
-from deepspyce.io.fits import df_to_fits, make_fits_header, raw_to_fits
+from deepspyce.io.fits import fits_header, raw_to_fits, write_fits 
 from deepspyce.io.iar import read_iar
-from deepspyce.io.raw import raw_to_df
+from deepspyce.io.raw import read_raw
 from deepspyce.utils import files_utils
 
 import pandas as pd
@@ -50,7 +50,7 @@ class TestRaw:
     @pytest.mark.parametrize("shape", [(300, 2), (2048, 5), (1024, 4)])
     @pytest.mark.parametrize("top", [100_000, 10_000, 1_000_000])
     @pytest.mark.parametrize("order", ["C", "F"])
-    def test_raw_to_df(
+    def test_read_raw(
         self,
         df_and_buff: callable,
         fmt: str,
@@ -63,88 +63,88 @@ class TestRaw:
         original, buff_raw = df_and_buff(
             fmt=fmt, shape=shape, top=top, order=order, seed=42
         )
-        result = raw_to_df(buff_raw, n_channels=shape[0], fmt=fmt, order=order)
+        result = read_raw(buff_raw, n_channels=shape[0], fmt=fmt, order=order)
 
         pd.testing.assert_frame_equal(original, result)
 
-    def test_raw_to_df_template(self):
+    def test_read_raw_template(self):
         """Test for reading template raw file to dataframe conversion."""
         original = datasets.load_csv_test()
-        result = raw_to_df(rawpath)
+        result = read_raw(rawpath)
 
         pd.testing.assert_frame_equal(original, result)
 
     @pytest.mark.parametrize(
         "data", [False, 0, 0.0, [0], (0, 0.0), {0: 0}, bytes(0)]
     )
-    def test_raw_to_df_wrong_input(self, data: any):
+    def test_read_raw_wrong_input(self, data: any):
         """Test for wrong input at dataframe conversion."""
 
         with pytest.raises(OSError):
-            raw_to_df(data)
+            read_raw(data)
 
-    def test_raw_to_df_wrong_path(self, wrong_path: str):
+    def test_read_raw_wrong_path(self, wrong_path: str):
         """Test for wrong raw path at dataframe conversion."""
 
         with pytest.raises(FileNotFoundError):
-            raw_to_df(wrong_path)
+            read_raw(wrong_path)
 
 
 class TestFits:
-    def test_make_fits_header_empty(self):
+    def test_fits_header_empty(self):
         """Test for making empty header."""
-        header = make_fits_header()
+        header = fits_header()
 
         assert header == astrofits.Header()
 
-    def test_make_fits_header_template(self):
+    def test_fits_header_template(self):
         """Test for making template header."""
-        header = make_fits_header(template=True)
+        header = fits_header(template=True)
 
         assert isinstance(header, astrofits.header.Header)
         assert header["ORIGIN"] == "IAR"
 
-    def test_make_fits_header_given(self):
+    def test_fits_header_given(self):
         """Test for making template header."""
         hdr = astrofits.Header()
         hdr["MAGICNUM"] = 42
-        header = make_fits_header(hdr)
+        header = fits_header(hdr)
 
         assert isinstance(header, astrofits.header.Header)
         assert header == hdr
 
-    def test_make_fits_header_given_and_template(self):
+    def test_fits_header_given_and_template(self):
         """Test for making template header."""
         hdr = astrofits.Header()
         hdr["MAGICNUM"] = 42
-        header = make_fits_header(hdr, template=True)
+        header = fits_header(hdr, template=True)
 
         assert isinstance(header, astrofits.header.Header)
         assert header["MAGICNUM"] == 42
         assert header["ORIGIN"] == "IAR"
 
-    def test_df_to_fits(self, stream: callable, df_rand: callable):
+    def test_write_fits(self, stream: callable, df_rand: callable):
         """Test for writing DataFrame into .fits file."""
         df = df_rand()
         path = stream()
-        df_to_fits(df, path)
+        write_fits(df, path)
 
         assert path.tell() == 89280
 
-    def test_df_to_fits_wrong_path(self, wrong_path: str, df_rand: callable):
+    def test_write_fits_wrong_path(self, wrong_path: str, df_rand: callable):
         """Test for wrong Dir at fits conversion."""
         df = df_rand()
 
         with pytest.raises(OSError):
-            df_to_fits(df, wrong_path)
+            write_fits(df, wrong_path)
 
-    def test_df_to_fits_and_header(self, stream: callable, df_rand: callable):
+    def test_write_fits_and_header(self, stream: callable, df_rand: callable):
         """Test for writing DataFrame into .fits file."""
         df = df_rand()
         hdr = astrofits.Header()
         hdr["MAGICNUM"] = 42
         path = stream()
-        df_to_fits(df, path, header=hdr)
+        write_fits(df, path, header=hdr)
 
         assert path.tell() == 89280
 

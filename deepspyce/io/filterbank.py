@@ -12,226 +12,337 @@
 # DOCS
 # =============================================================================
 
-"""Module with .fil I/O functions."""
+"""Module with filterbank (.fil) I/O functions."""
 
 # =============================================================================
 # IMPORTS
 # =============================================================================
 
 import os
-import struct
-from datetime import datetime
+import warnings
 
-from deepspyce.utils.auxiliar import data_to_bytes, deepwarn
 from deepspyce.utils.files_utils import (
-    get_file_attr,
-    is_filelike,
-    read_file,
+    open_file,
     write_to_file,
+)
+from deepspyce.utils.misc import (
+    bytes_to_data,
+    bytes_to_header,
+    data_to_bytes,
+    header_to_bytes,
 )
 
 import numpy as np
 
-import pandas as pd
+# ============================================================================
+# UTILS
+# ============================================================================
 
-from .iar import read_iar
+_header_types = dict(
+    {
+        "telescope_id": int,
+        "machine_id": int,
+        "data_type": int,
+        "rawdatafile": str,
+        "source_name": str,
+        "barycentric": int,
+        "pulsarcentric": int,
+        "az_start": float,
+        "za_start": float,
+        "src_raj": float,
+        "src_dej": float,
+        "tstart": float,
+        "tsamp": float,
+        "nbits": int,
+        "fch1": float,
+        "foff": float,
+        "nchans": int,
+        "nifs": int,
+        "refdm": float,
+        "period": float,
+    }
+)
 
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
 
 
-def _iardict_to_fil_header(iardict: dict) -> dict:
-    """Build dict header from dict iar."""
-    source_name = iardict["Source Name"]
-    source_ra = iardict["Source RA (hhmmss.s)"]
-    source_dec = iardict["Source DEC (ddmmss.s)"]
-    # ref_dm = iardict["Reference DM"]
-    # pul_period = iardict["Pulsar Period"]
-    # high_freq = iardict["Highest Observation Frequency (MHz)"]
-    telescope_id = int(iardict["Telescope ID"])
-    machine_id = int(iardict["Machine ID"])
-    data_type = int(iardict["Data Type"])
-    # observing_time = int(iardict["Observing Time (minutes)"])
-    # gain = iardict["Gain (dB)"]
-    # bandwidth = int(iardict["Total Bandwith (MHz)"])
-    avg_data = int(iardict["Average Data"])
-    sub_bands = int(iardict["Sub Bands"])
+def check_header(header: dict) -> bool:
+    """
+    Filterbank header data types checker.
 
-    # ---- ROACH ----
-    # values
-    fft_pts = 128
-    adc_clk = 200e6
-    #  parameters
-    tsamp = avg_data * fft_pts / adc_clk
-    f_off = adc_clk / fft_pts * 1e-6
+    Checks that the filterbank main entries of a given dictionary header
+    have their correct data type.
+    Raises a warning for each incorrect data type.
 
-    time_now = datetime.now().strftime("_%Y%m%d_%H%M%S")
+    Parameters
+    ----------
+    header : dict
+        Dictionary to be checked.
 
-    # tsamp = 1e6 / float(bandwidth) * avg_data
-    rawdatafile = f"ds{avg_data}_{source_name}{time_now}.fil"
-
-    return {
-        "telescope_id": telescope_id,
-        "machine_id": machine_id,
-        "data_type": data_type,
-        "rawdatafile": rawdatafile,
-        "source_name": source_name,
-        "az_start": 0.0,
-        "za_start": 0.0,
-        "src_raj": source_ra,
-        "src_dej": source_dec,
-        "tstart": 0.0,
-        "tsamp": tsamp,
-        "fch1": 0.0,
-        "foff": f_off,
-        "nchans": sub_bands,
-        "nifs": 1,
-        "ibeam": 1,
-        "nbeams": 1,
-    }
-
-
-def _check_key_pos(
-    header: dict, key: str, pos: int, verb: bool = False
-) -> bool:
-    keys = list(header.keys())
-    loc = keys.index(key) if key in keys else None
-    if loc == pos:
-        return True
-    if loc is None:
-        if verb:
-            deepwarn(f"{key} is missing in the header.")
-        return None
-    if verb:
-        deepwarn(f"{key} is not in the {pos} header key.")
-
-    return False
-
-
-def check_header_start_end(header: dict, verb: bool = False) -> tuple:
-    """Check the HEADER_START and HEADER_END entries of the header."""
-    start = _check_key_pos(header, "HEADER_START", 0, verb)
-    end = _check_key_pos(header, "HEADER_END", len(header) - 1, verb)
-    if start and (header["HEADER_START"] is not None):
-        if verb:
-            deepwarn("header['HEADER_START'] should be None!")
-        start = False
-    if end and (header["HEADER_END"] is not None):
-        if verb:
-            deepwarn("header['HEADER_END'] should be None!")
-        end = False
-    if (start and end) and verb:
-        print("HEADER_START and HEADER END are OK!.")
-
-    return (start, end)
-
-
-def fixed_header_start_end(header: dict, check: bool = True) -> dict:
-    """Fix the HEADER_START and HEADER_END entries of the header."""
-    if check:
-        start, end = check_header_start_end(header, False)
-        if start and end:
-            return header
-    hs = "HEADER_START"
-    he = "HEADER_END"
-    fixedheader = dict({hs: None})
+    Return
+    ------
+    good : bool
+        Boolean indicating if everything is ok.
+    """
     for key, value in header.items():
-        if key not in [hs, he]:
-            fixedheader[key] = value
-    fixedheader[he] = None
+        if key in _header_types.keys():
+            dtype = _header_types.get(key)
+            if (value is not None) and not isinstance(value, dtype):
+                warnings.warn(
+                    "WARNING. Key %s value should be type %s" % (key, dtype)
+                )
+                good = False
+        # elif (key in ["HEADER_START", "HEADER_END"]) and (value is not None):
+        #     warnings.warn("WARNING. %s key value should be None" %key)
+        #     good = False
+        else:
+            warnings.warn("WARNING. Unexpected key: %s" % key)
+            good = False
 
-    return fixedheader
-
-
-def _encode_header(hedicc: dict) -> bytes:
-
-    bina = b""
-    for key, value in hedicc.items():
-        ret = struct.pack("I", len(key)) + key.encode()
-        if value is not None:
-            if isinstance(value, str):
-                ret = ret + struct.pack("I", len(value)) + value.encode()
-            elif isinstance(value, int):
-                ret = ret + struct.pack("<l", value)
-            else:
-                ret = ret + struct.pack("<d", value)
-        bina = bina + ret
-
-    return bina
+    return good
 
 
-def iar_to_fil_header(iar, encode: bool = False) -> bytes:
-    """Transform .iar data to header."""
-    if not isinstance(iar, dict):
-        iar = read_iar(iar)
-    head = _iardict_to_fil_header(iar)
-    if not encode:
-        return head
-    head = fixed_header_start_end(head)
+def filterbank_header(header: dict = dict()) -> dict:
+    """
+    Filterbank header initializer.
 
-    return _encode_header(head)
+    Creates a None value header, with standard filterbank keys.
+    If header is a dictionary, is is used to extend and update (give a value)
+    to the created header. The values must be casted into their proper type.
+
+    Parameters
+    ----------
+    header : dict, default value = dict()
+        Dictionary used to initialize update filterbank header.
+
+    Return
+    ------
+    fheader : ``DeepHeader class`` object.
+        Dictionary with main filterbank keys.
+    """
+    fheader = dict({k: None for k in _header_types.keys()})
+    fheader.update(header)
+
+    return fheader
 
 
-def _binraw_to_filterbank(
-    bin_raw: bytes,
-    headerdict: dict = None,
+def read_filterbank_header(
+    path: os.PathLike, key_fmts: dict = dict(), swap: bool = False
+) -> dict:
+    """
+    Filterbank header reader.
+
+    Reads a filterbank header and constructs a deepheader object
+    from it.
+
+    Parameters
+    ----------
+    path : str or file like
+        Path to the filterbank file containing the header.
+    key_fmts : dict, default value = dict()
+        Dictionary with key data types, to be decoded properly.
+        It can also contain the string formats.
+        This dictionary is used to update the standard
+        filterbank header types.
+    swap : bool, default value = False
+        Forces swaps byte order of all readed data.
+
+    Return
+    -------
+    header : ``DeepHeader class`` object.
+    """
+    with open_file(path, "rb") as buff:
+        key_fmts = dict(_header_types, **key_fmts)
+
+        return bytes_to_header(buff, key_fmts, swap)
+
+
+def read_filterbank_data(
+    path: os.PathLike,
+    len_header: int = None,
+    n_channels: int = 1,
+    fmt: np.dtype = ">i8",
+    order: str = "F",
+    swap: bool = False,
+    key_fmts: dict = dict(),
+) -> np.ndarray:
+    """
+    Filterbank data reader.
+
+    Reads a filterbank file and constructs a deepdata object
+    from its data.
+
+    Parameters
+    ----------
+    path : str or file like
+        Path to the filterbank file containing the data.
+    len_header : int, default value = None
+        Length of the header (in bytes) to be skipped.
+        If None, there is an attempt to read the header, in
+        order to skip it.
+    n_channels : int, default value = 2048
+        Number of channels (cols) of the data.
+    fmt : format, default value = ">i8"
+        Data type of the value to be decoded.
+        It can also be a string format.
+    order : {"C", "F"}, default value = "F"
+        Read the data elements using this index order.
+        "C" indicates C-like index order.
+        "F" indicates Fortran-like index order.
+    swap : bool, default value = False
+        Indicates if the byteorder of the data read is returned swapped.
+        It can also be a string of the wanted byte order.
+    key_fmts : dict, default value = dict()
+        Dictionary with key data types, to be decoded properly.
+        It can also contain the string formats.
+        This dictionary is used to update the standard
+        filterbank header types.
+        Unused if len_header is not None.
+
+    Return
+    ------
+    deepframe : ``DeepFrame class`` object.
+    """
+    with open_file(path, "rb") as buff:
+        if len_header is None:
+            key_fmts = dict(_header_types, **key_fmts)
+            bytes_to_header(buff, key_fmts, swap)
+        else:
+            buff.seek(len_header)
+        data = bytes_to_data(buff, n_channels, fmt, order, swap)
+
+    return data
+
+
+def read_filterbank(
+    path: os.PathLike,
+    n_channels: int = 2048,
+    fmt: np.dtype = ">i8",
+    order: str = "F",
+    swap: bool = False,
+    key_fmts: dict = dict(),
+) -> tuple:
+    """
+    Filterbank reader.
+
+    Reads a filterbank file and constructs a deepframe object
+    from its data and its header.
+
+    Parameters
+    ----------
+    path : str or file like
+        Path to the filterbank file containing the data.
+    n_channels : int, default value = 2048
+        Number of channels (cols) of the data.
+    fmt : format, default value = ">i8"
+        Data type of the value to be decoded.
+        It can also be a string format.
+    order : {"C", "F"}, default value = "F"
+        Read the data elements using this index order.
+        "C" indicates C-like index order.
+        "F" indicates Fortran-like index order.
+    swap : bool, default value = False
+        Indicates if the byteorder of the data read is returned swapped.
+        It can also be a string of the wanted byte order.
+    key_fmts : dict, default value = dict()
+        Dictionary with key data types, to be decoded properly.
+        It can also contain the string formats.
+        This dictionary is used to update the standard
+        filterbank header types.
+        Unused if len_header is not None.
+
+    Return
+    ------
+    deepframe : ``DeepFrame class`` object.
+    """
+    key_fmts = dict(_header_types, **key_fmts)
+    with open_file(path, "rb") as buff:
+        header = bytes_to_header(buff, key_fmts, swap)
+        data = bytes_to_data(buff, n_channels, fmt, order, swap)
+
+    return (header, data)
+
+
+def write_filterbank(
+    data: np.ndarray,
+    header: dict = dict(),
+    key_fmts: dict = dict(),
     outfile: os.PathLike = None,
+    fmt: np.dtype = ">i8",
+    order: str = "F",
+    swap: bool = False,
     overwrite: bool = False,
-) -> None:
-    """Generate .fil file from header dict and raw file."""
-    if headerdict is None:
-        headerdict = dict()
-    if not isinstance(headerdict, dict):
-        headerdict = dict(headerdict)
-    name = headerdict.get("rawdatafile")
+):
+    """
+    Filterbank file writer.
+
+    Writes a numpy ndarray data and
+    a header dict into a filterbank file.
+
+    Parameters
+    ----------
+    data : numpy ndarray
+        Array with data to be written into filterbank file.
+    header : dict
+        Dictionary of header to be stored into filterbank file.
+    outfile : str or file like
+        Path or file like objet to the filterbank to be written.
+    fmt : format, default value = ">i8"
+        Data type format. If None, it is infered from the data.
+    order : {"C", "F"}, default value = "F"
+        Read the data elements using this index order.
+        "C" indicates C-like index order.
+        "F" indicates Fortran-like index order.
+    swap : bool, default value = False
+        Indicates if the byteorder of the data to be written is swapped.
+        It can also be a string of the wanted byte order.
+    overwrite : bool, default value = False
+        Indicates if, in case the outfile already exists, it is overwriten.
+    """
+    name = header.get("rawdatafile", None)
     if outfile is None:
         if name is None:
             raise OSError("Could not resolve/infer output file name.")
         else:
             outfile = name
             filen = outfile
-    elif is_filelike(outfile):
-        filen = get_file_attr(outfile, "name")
+    elif hasattr(outfile, "name"):
+        filen = os.path.basename(getattr(outfile, "name"))
     else:
         filen = os.path.basename(outfile)
     if filen != name:
-        deepwarn(
+        warnings.warn(
             f"\nFile name: '{filen}' and "
             + f"\nrawdatafile: '{name}' in header "
             + "\ndo not match."
         )
-    headerdict = fixed_header_start_end(headerdict)
-    bin_header = _encode_header(headerdict)
-    write_to_file(outfile, bin_header, "wb", overwrite)
-    write_to_file(outfile, bin_raw, "ab")
+    key_fmts = dict(_header_types, **key_fmts)
+    header_bytes = header_to_bytes(header, key_fmts, swap)
+    data_bytes = data_to_bytes(data, fmt, order, swap)
+    all_bytes = header_bytes + data_bytes
+
+    write_to_file(all_bytes, outfile, "wb", overwrite)
 
     return
 
+def asdghashdg(x: int = 2) -> float:
+    """
+    La doucuuuu
 
-def raw_to_filterbank(
-    rawfile: os.PathLike,
-    header: dict = None,
-    outfile: os.PathLike = None,
-    overwrite: bool = False,
-) -> None:
-    """Generate .fil file from header dict and raw data file."""
-    bin_raw = read_file(rawfile, "rb")
-    _binraw_to_filterbank(bin_raw, header, outfile, overwrite)
+    Si pa
 
-    return
+    Parameters
+    ----------
+    x: My value, default = 2
+    """
+    ...
+    pass
+    f = dict()
+    h = list()
 
+    f.update(3)
 
-def df_to_filterbank(
-    df: pd.DataFrame,
-    header: dict = None,
-    outfile: os.PathLike = None,
-    overwrite: bool = False,
-    fmt: np.dtype = ">i8",
-    order: str = "F",
-) -> None:
-    """Generate .fil file from dataframe and header dict."""
-    bin_raw = data_to_bytes(df, fmt, order)
-    _binraw_to_filterbank(bin_raw, header, outfile, overwrite)
-
+    h.update(23)
     return

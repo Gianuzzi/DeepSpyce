@@ -26,3 +26,4 @@ __version__ = "0.0.1"
 # =============================================================================
 
 from . import io  # noqa
+from .core import DeepFrame, DeepHeader  # noqa
