@@ -32,7 +32,7 @@ from .iar import read_iar
 # UTILS
 # =============================================================================
 
-_fits_header_temp = OrderedDict(
+FITS_HEADER_TEMP = OrderedDict(
     {
         "SIMPLE": ("T", "/ conforms to FITS standard"),
         "BITPIX": (8, "/ BITS/PIXEL"),
@@ -47,6 +47,52 @@ _fits_header_temp = OrderedDict(
             "/ this file was created by DeepSpyce",
         ),
         "FITSVER": ("1.6", "/ FITS definition version"),
+    }
+)
+
+FILT_HEADER_TYPES = dict(
+    {
+        "telescope_id": int,
+        "machine_id": int,
+        "data_type": int,
+        "rawdatafile": str,
+        "source_name": str,
+        "barycentric": int,
+        "pulsarcentric": int,
+        "az_start": float,
+        "za_start": float,
+        "src_raj": float,
+        "src_dej": float,
+        "tstart": float,
+        "tsamp": float,
+        "nbits": int,
+        "fch1": float,
+        "foff": float,
+        "nchans": int,
+        "nifs": int,
+        "refdm": float,
+        "period": float,
+    }
+)
+    
+IAR_HEADER_TYPES = dict(
+    {
+        "Source Name": str,
+        "Source RA (hhmmss.s)": float,
+        "Source DEC (ddmmss.s)": float,
+        "Reference DM": float,
+        "Pulsar Period": float,
+        "Highest Observation Frequency (MHz)": float,
+        "Telescope ID": int,
+        "Machine ID": int,
+        "Data Type": int,
+        "Observing Time (minutes)": float,
+        "Local Oscillator (MHz)": float,
+        "Gain (dB)": float,
+        "Total Bandwith (MHz)": float,
+        "Average Data": int,
+        "Sub Bands": int,
+        "Cal": int,
     }
 )
 
@@ -209,6 +255,110 @@ def _iardict_to_fil_header(iardic: dict, extra: bool = False) -> dict:
 # FUNCTIONS
 # ============================================================================
 
+
+
+def fits_header(header: dict = dict()) -> fits.Header: ## FITS
+    """
+    Fits header generator.
+
+    Creates a fits (.fits) header from a dictionary.
+    The resulting header entrie can be manipulated as a common dictionary.
+
+    Parameters
+    ----------
+    header : dict or (str or file like)
+        Dictionary used to create .fil header. If a dictionary is not given,
+        a path is assumed, and there is an attempt to create a dictionary
+        assuming a .iar file like.
+
+    template : bool, default value = False
+        Indicates if some common .fits header entries are added (eg. SIMPLE,
+        BITPIX, NAXIS...)
+
+    Return
+    ----------
+    header : fits Header
+        Fits Header than can be added into .fits files.
+    """
+    if not isinstance(header, fits.Header):
+        if not isinstance(header, dict):
+            header = read_iar(header)
+        header = fits.Header(header)
+    if template:
+        # Sample: TREG_091209.cal.acs.txt [Single Dish FITS (SDFITS)]
+        header["SIMPLE"] = ("T", "/ conforms to FITS standard")
+        header["BITPIX"] = (8, "/ BITS/PIXEL")
+        header["NAXIS"] = (0, "/ number of array dimensions")
+        header["EXTEND"] = ("T", "/File contains extensions")
+        header["DATE"] = (datetime.today().strftime("%y-%m-%d"), "/")
+        header["ORIGIN"] = ("IAR", "/ origin of observation")
+        header["TELESCOP"] = ("Antena del IAR", "/ the telescope used")
+        header["OBSERVAT"] = ("IAR", "/ the observatory")
+        header["GUIDEVER"] = (
+            "DeepSpyce ver1.0",
+            "/ this file was created by DeepSpyce",
+        )
+        header["FITSVER"] = ("1.6", "/ FITS definition version")
+
+    return header
+
+def filterbank_header(header: dict = dict()) -> dict: ## FILTERBANK
+    """
+    Filterbank header initializer.
+
+    Creates a None value header, with standard filterbank keys.
+    If header is a dictionary, is is used to extend and update (give a value)
+    to the created header. The values must be casted into their proper type.
+
+    Parameters
+    ----------
+    header : dict, default value = dict()
+        Dictionary used to initialize update filterbank header.
+
+    Return
+    ------
+    fheader : ``DeepHeader class`` object.
+        Dictionary with main filterbank keys.
+    """
+    fheader = dict({k: None for k in _header_types.keys()})
+    fheader.update(header)
+
+    return fheader
+
+def check_header(header: dict) -> bool: ## FILTERBANK
+    """
+    Filterbank header data types checker.
+
+    Checks that the filterbank main entries of a given dictionary header
+    have their correct data type.
+    Raises a warning for each incorrect data type.
+
+    Parameters
+    ----------
+    header : dict
+        Dictionary to be checked.
+
+    Return
+    ------
+    good : bool
+        Boolean indicating if everything is ok.
+    """
+    for key, value in header.items():
+        if key in _header_types.keys():
+            dtype = _header_types.get(key)
+            if (value is not None) and not isinstance(value, dtype):
+                warnings.warn(
+                    "WARNING. Key %s value should be type %s" % (key, dtype)
+                )
+                good = False
+        # elif (key in ["HEADER_START", "HEADER_END"]) and (value is not None):
+        #     warnings.warn("WARNING. %s key value should be None" %key)
+        #     good = False
+        else:
+            warnings.warn("WARNING. Unexpected key: %s" % key)
+            good = False
+
+    return good
 
 def check_header_start_end(header: dict, verb: bool = False) -> tuple:
     """

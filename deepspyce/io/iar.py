@@ -23,31 +23,6 @@ import os
 from deepspyce.utils.misc import dict_from_file, dict_to_file
 
 # ============================================================================
-# UTILS
-# ============================================================================
-
-_header_types = dict(
-    {
-        "Source Name": str,
-        "Source RA (hhmmss.s)": float,
-        "Source DEC (ddmmss.s)": float,
-        "Reference DM": float,
-        "Pulsar Period": float,
-        "Highest Observation Frequency (MHz)": float,
-        "Telescope ID": int,
-        "Machine ID": int,
-        "Data Type": int,
-        "Observing Time (minutes)": float,
-        "Local Oscillator (MHz)": float,
-        "Gain (dB)": float,
-        "Total Bandwith (MHz)": float,
-        "Average Data": int,
-        "Sub Bands": int,
-        "Cal": int,
-    }
-)
-
-# ============================================================================
 # FUNCTIONS
 # ============================================================================
 

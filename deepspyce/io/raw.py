@@ -20,10 +20,9 @@
 
 import os
 
+import numpy as np
 from deepspyce.utils.files_utils import read_file, write_to_file
 from deepspyce.utils.misc import bytes_to_data, data_to_bytes
-
-import numpy as np
 
 # ============================================================================
 # FUNCTIONS
