@@ -59,7 +59,8 @@ def is_opened(fileobj: io.IOBase) -> bool:
         File object.
     """
 
-    return not getattr(fileobj, "closed", True)
+    attr = not getattr(fileobj, "closed", True)
+    return attr() if callable(attr) else attr
 
 
 def is_writable(fileobj: io.FileIO) -> bool:
@@ -72,7 +73,8 @@ def is_writable(fileobj: io.FileIO) -> bool:
         File object.
     """
 
-    return getattr(fileobj, "writable", False)
+    attr = getattr(fileobj, "writable", False)
+    return attr() if callable(attr) else attr
 
 
 def is_readable(fileobj: io.FileIO) -> bool:
@@ -85,7 +87,8 @@ def is_readable(fileobj: io.FileIO) -> bool:
         File object.
     """
 
-    return getattr(fileobj, "readable", False)
+    attr = getattr(fileobj, "readable", False)
+    return attr() if callable(attr) else attr
 
 
 def file_exists(path_str: os.PathLike) -> bool:

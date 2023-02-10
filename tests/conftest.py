@@ -14,6 +14,7 @@
 
 import io
 import pathlib
+import tempfile
 
 import numpy as np
 
@@ -63,5 +64,9 @@ def df_and_buff(df_rand, stream) -> callable:
 
 @pytest.fixture(scope="session")
 def wrong_path() -> str:
-
     return pathlib.Path("Not", "A", "Valid", "Dir").resolve()
+
+
+@pytest.fixture(scope="session")
+def namedtempfile() -> tempfile._TemporaryFileWrapper:
+    return tempfile.NamedTemporaryFile

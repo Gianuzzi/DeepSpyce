@@ -21,104 +21,21 @@
 import os
 import warnings
 
-import numpy as np
 from deepspyce.utils.files_utils import open_file, write_to_file
-from deepspyce.utils.misc import (bytes_to_data, bytes_to_header,
-                                  data_to_bytes, header_to_bytes)
+from deepspyce.utils.misc import (
+    bytes_to_data,
+    bytes_to_dict,
+    data_to_bytes,
+    dict_to_bytes,
+)
+
+import numpy as np
 
 from .header import FILT_HEADER_TYPES
 
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
-
-
-def _read_filterbank_header(
-    path: os.PathLike, key_fmts: dict = dict(), swap: bool = False
-) -> dict:
-    """
-    Filterbank header reader.
-
-    Reads a filterbank header and constructs a deepheader object
-    from it.
-
-    Parameters
-    ----------
-    path : str or file like
-        Path to the filterbank file containing the header.
-    key_fmts : dict, default value = dict()
-        Dictionary with key data types, to be decoded properly.
-        It can also contain the string formats.
-        This dictionary is used to update the standard
-        filterbank header types.
-    swap : bool, default value = False
-        Forces swaps byte order of all readed data.
-
-    Return
-    -------
-    header : ``DeepHeader class`` object.
-    """
-    with open_file(path, "rb") as buff:
-        key_fmts = dict(FILT_HEADER_TYPES, **key_fmts)
-
-        return bytes_to_header(buff, key_fmts, swap)
-
-
-def _read_filterbank_data(
-    path: os.PathLike,
-    len_header: int = None,
-    n_channels: int = 1,
-    fmt: np.dtype = ">i8",
-    order: str = "F",
-    swap: bool = False,
-    key_fmts: dict = dict(),
-) -> np.ndarray:
-    """
-    Filterbank data reader.
-
-    Reads a filterbank file and constructs a deepdata object
-    from its data.
-
-    Parameters
-    ----------
-    path : str or file like
-        Path to the filterbank file containing the data.
-    len_header : int, default value = None
-        Length of the header (in bytes) to be skipped.
-        If None, there is an attempt to read the header, in
-        order to skip it.
-    n_channels : int, default value = 2048
-        Number of channels (cols) of the data.
-    fmt : format, default value = ">i8"
-        Data type of the value to be decoded.
-        It can also be a string format.
-    order : {"C", "F"}, default value = "F"
-        Read the data elements using this index order.
-        "C" indicates C-like index order.
-        "F" indicates Fortran-like index order.
-    swap : bool, default value = False
-        Indicates if the byteorder of the data read is returned swapped.
-        It can also be a string of the wanted byte order.
-    key_fmts : dict, default value = dict()
-        Dictionary with key data types, to be decoded properly.
-        It can also contain the string formats.
-        This dictionary is used to update the standard
-        filterbank header types.
-        Unused if len_header is not None.
-
-    Return
-    ------
-    deepframe : ``DeepFrame class`` object.
-    """
-    with open_file(path, "rb") as buff:
-        if len_header is None:
-            key_fmts = dict(FILT_HEADER_TYPES, **key_fmts)
-            bytes_to_header(buff, key_fmts, swap)
-        else:
-            buff.seek(len_header)
-        data = bytes_to_data(buff, n_channels, fmt, order, swap)
-
-    return data
 
 
 def read_filterbank(
@@ -165,19 +82,23 @@ def read_filterbank(
     ------
     deepframe : ``DeepFrame class`` object.
     """
-    if which == "header":
-        return _read_filterbank_header(path, key_fmts, swap)
-    elif (which == "data") or isinstance(which, int):
-        len_header = which if isinstance(which, int) else None
-        return _read_filterbank_data(
-            path, len_header, n_channels, fmt, order, swap, key_fmts
-        )
     key_fmts = dict(FILT_HEADER_TYPES, **key_fmts)
+
     with open_file(path, "rb") as buff:
-        header = bytes_to_header(buff, key_fmts, swap)
+        if isinstance(which, int):
+            buff.seek(which)
+        else:
+            header = bytes_to_dict(buff, key_fmts, swap)
         data = bytes_to_data(buff, n_channels, fmt, order, swap)
 
-    return (header, data)
+    if which == "header":
+        return header
+    if (which == "data") or isinstance(which, int):
+        return data
+    if which == "both":
+        return (header, data)
+
+    return
 
 
 def write_filterbank(
@@ -221,6 +142,10 @@ def write_filterbank(
     overwrite : bool, default value = False
         Indicates if, in case the outfile already exists, it is overwriten.
     """
+    if not isinstance(header, dict):
+        raise TypeError(
+            "Header must be a dict. Type {} was given".format(type(header))
+        )
     name = header.get("rawdatafile", None)
     if outfile is None:
         if name is None:
@@ -239,7 +164,7 @@ def write_filterbank(
             + "\ndo not match."
         )
     key_fmts = dict(FILT_HEADER_TYPES, **key_fmts)
-    header_bytes = header_to_bytes(header, key_fmts, swap)
+    header_bytes = dict_to_bytes(header, key_fmts, swap)
     data_bytes = data_to_bytes(data, fmt, order, swap)
     all_bytes = header_bytes + data_bytes
 

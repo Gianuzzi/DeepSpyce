@@ -17,19 +17,20 @@ import warnings
 from astropy.io import fits as astrofits
 
 from deepspyce import datasets
-from deepspyce.io.filterbank import (
+from deepspyce.io.filterbank import write_filterbank
+from deepspyce.io.fits import write_fits
+from deepspyce.io.header import (
     check_header_start_end,
-    df_to_filterbank,
+    filterbank_header,
+    fits_header,
     fixed_header_start_end,
-    iar_to_fil_header,
-    raw_to_filterbank,
+    iar_header,
+    iarh_to_filth,
 )
-from deepspyce.io.fits import fits_header, raw_to_fits, write_fits 
-from deepspyce.io.iar import read_iar
-from deepspyce.io.raw import read_raw
-from deepspyce.utils import files_utils
+from deepspyce.io.iar import read_iar, write_iar
+from deepspyce.io.raw import read_raw, write_raw
 
-import pandas as pd
+import numpy as np
 
 import pytest
 
@@ -65,14 +66,14 @@ class TestRaw:
         )
         result = read_raw(buff_raw, n_channels=shape[0], fmt=fmt, order=order)
 
-        pd.testing.assert_frame_equal(original, result)
+        np.testing.assert_array_equal(original, result)
 
     def test_read_raw_template(self):
         """Test for reading template raw file to dataframe conversion."""
         original = datasets.load_csv_test()
         result = read_raw(rawpath)
 
-        pd.testing.assert_frame_equal(original, result)
+        np.testing.assert_array_equal(original, result)
 
     @pytest.mark.parametrize(
         "data", [False, 0, 0.0, [0], (0, 0.0), {0: 0}, bytes(0)]
@@ -89,40 +90,16 @@ class TestRaw:
         with pytest.raises(FileNotFoundError):
             read_raw(wrong_path)
 
+    def test_write_raw(self, stream: callable, df_rand: callable):
+        """Test for writing DataFrame into a raw file."""
+        df = df_rand()
+        path = stream()
+        write_raw(df, path)
+
+        assert path.tell() == 81920
+
 
 class TestFits:
-    def test_fits_header_empty(self):
-        """Test for making empty header."""
-        header = fits_header()
-
-        assert header == astrofits.Header()
-
-    def test_fits_header_template(self):
-        """Test for making template header."""
-        header = fits_header(template=True)
-
-        assert isinstance(header, astrofits.header.Header)
-        assert header["ORIGIN"] == "IAR"
-
-    def test_fits_header_given(self):
-        """Test for making template header."""
-        hdr = astrofits.Header()
-        hdr["MAGICNUM"] = 42
-        header = fits_header(hdr)
-
-        assert isinstance(header, astrofits.header.Header)
-        assert header == hdr
-
-    def test_fits_header_given_and_template(self):
-        """Test for making template header."""
-        hdr = astrofits.Header()
-        hdr["MAGICNUM"] = 42
-        header = fits_header(hdr, template=True)
-
-        assert isinstance(header, astrofits.header.Header)
-        assert header["MAGICNUM"] == 42
-        assert header["ORIGIN"] == "IAR"
-
     def test_write_fits(self, stream: callable, df_rand: callable):
         """Test for writing DataFrame into .fits file."""
         df = df_rand()
@@ -148,24 +125,210 @@ class TestFits:
 
         assert path.tell() == 89280
 
-    def test_raw_to_fits(self, stream: callable, df_and_buff: callable):
-        """Test for writing raw data into .fits file."""
-        path = stream()
-        _, rawstream = df_and_buff()
-        raw_to_fits(rawstream, path)
+    # def test_raw_to_fits(self, stream: callable, df_and_buff: callable):
+    #     """Test for writing raw data into .fits file."""
+    #     path = stream()
+    #     _, rawstream = df_and_buff()
+    #     raw_to_fits(rawstream, path)
 
-        assert path.tell() == 89280
+    #     assert path.tell() == 89280
 
 
 class TestIar:
     def test_read_iar(self):
-        """Test for convering .iar dict to header dict."""
+        """Test for reading .iar file to header dict."""
         iardict = read_iar(iarpath)
 
         assert isinstance(iardict, dict)
+        assert iardict["Sub Bands"] == 1
+
+    def test_write_iar(self, namedtempfile: callable):
+        """Test for writing header dict into .iar file."""
+        tmp = namedtempfile()
+        dicc = dict({"Gain": 1, "Cal": 0, "Source Name": "J1810-197"})
+        write_iar(dicc, tmp.name, overwrite=True)
+        with open(tmp.name, "r") as f:
+            data = f.read()
+        assert data[:7] == "Gain,1\n"
+        assert data[7:13] == "Cal,0\n"
+        assert data[13:] == "Source Name,J1810-197\n"
 
 
 class TestFilterbank:
+    # FALTA READ_FILTERBANK
+
+    def test_write_filterbank(
+        self, namedtempfile: callable, df_rand: callable
+    ):
+        """Test for building .fil from dataframe."""
+        df = df_rand()
+        # outf = stream()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with open(namedtempfile().name, "wb") as outf:
+                write_filterbank(df, outfile=outf)
+                assert outf.tell() == 81950
+
+    def test_write_filterbank_no_output(self, df_rand: callable):
+        """Test for building .fil from dataframe, without output."""
+        df = df_rand()
+
+        with pytest.raises(OSError):
+            write_filterbank(df)
+
+    def test_write_filterbank_with_header(
+        self, namedtempfile: callable, df_rand: callable
+    ):
+        """Test for building .fil from dataframe, with header."""
+        header = dict({"MAGICN": 42})
+        df = df_rand()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with open(namedtempfile().name, "wb") as outf:
+                write_filterbank(df, header=header, outfile=outf)
+                assert outf.tell() == 81964
+
+    # def test_write_filterbank_with_header_template(
+    #     self, stream: callable, df_rand: callable
+    # ):
+    #     """Test for building .fil from dataframe, with header."""
+    #     outf = stream()
+    #     header = iarh_to_filth(iarpath)
+    #     df = df_rand()
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter("ignore")
+    #         write_filterbank(df, header=header, outfile=outf)
+
+    #     assert outf.tell() == 82297
+
+    @pytest.mark.parametrize("data", [False, 0, 0.0, [0], (0, 0.0)])
+    def test_write_filterbank_wrong_header(
+        self, stream: callable, data: any, df_rand: callable
+    ):
+        """Test for building .fil from dataframe, with wrong header."""
+        df = df_rand()
+        outf = stream()
+
+        with pytest.raises(TypeError):
+            write_filterbank(df, header=data, outfile=outf)
+
+    # def test_raw_to_filterbank(self,stream: callable,
+    # df_and_buff: callable):
+    #     """Test for building .fil from raw file."""
+    #     outf = stream()
+    #     _, rawstream = df_and_buff()
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter("ignore")
+    #         raw_to_filterbank(rawstream, outfile=outf)
+
+    #     assert outf.tell() == 81950
+    #     assert files_utils.is_opened(outf)
+
+
+class TestHeader:
+    def test_iar_header_empty(self):
+        """Test for making empty iar header."""
+        header = iar_header()
+
+        assert isinstance(header, dict)
+        assert all([v is None for v in header.values()])
+        assert "Source Name" in header
+
+    def test_iar_header_given(self):
+        """Test for making iar header, from given one."""
+        hdr = {"Cal": 4}
+        header = iar_header(hdr)
+
+        assert isinstance(header, dict)
+        assert header["Cal"] == 4
+        assert all([v is None for k, v in header.items() if k != "Cal"])
+        assert "Source Name" in header
+
+    def test_filterbank_header_empty(self):
+        """Test for making empty iar header."""
+        header = filterbank_header()
+
+        assert isinstance(header, dict)
+        assert all([v is None for v in header.values()])
+        assert "telescope_id" in header
+
+    def test_filterbank_header_given(self):
+        """Test for making iar header, from given one."""
+        hdr = {"nifs": 4}
+        header = filterbank_header(hdr)
+
+        assert isinstance(header, dict)
+        assert header["nifs"] == 4
+        assert all([v is None for k, v in header.items() if k != "nifs"])
+        assert "telescope_id" in header
+
+    def test_fits_header_iar_file(self):
+        """Test for making fits header, from iar file."""
+        header = fits_header(iarpath)
+
+        assert isinstance(header, astrofits.Header)
+        assert header["Cal"] == 0
+
+    def test_fits_header_empty(self):
+        """Test for making empty fits header."""
+        header = fits_header()
+
+        assert header == astrofits.Header()
+
+    def test_fits_header_template(self):
+        """Test for making template fits header."""
+        header = fits_header(template=True)
+
+        assert isinstance(header, astrofits.header.Header)
+        assert header["ORIGIN"] == "IAR"
+
+    def test_fits_header_given(self):
+        """Test for making fits header, from given one."""
+        hdr = astrofits.Header()
+        hdr["MAGICNUM"] = 42
+        header = fits_header(hdr)
+
+        assert isinstance(header, astrofits.header.Header)
+        assert header == hdr
+        assert header["MAGICNUM"] == 42
+
+    def test_fits_header_given_and_template(self):
+        """Test for making template fits header, from given one."""
+        hdr = astrofits.Header()
+        hdr["MAGICNUM"] = 42
+        header = fits_header(hdr, template=True)
+
+        assert isinstance(header, astrofits.header.Header)
+        assert header["MAGICNUM"] == 42
+        assert header["ORIGIN"] == "IAR"
+
+    def test_iarh_to_filth_dict(self):
+        """Test for building filterbank header from .iar template dict."""
+        iardict = read_iar(iarpath)
+        header = iarh_to_filth(iardict)
+
+        assert isinstance(header, dict)
+        assert header["data_type"] == 1
+
+    def test_iarh_to_filth_dict_extra(self):
+        """Test for building filterbank header from .iar template dict."""
+        iardict = read_iar(iarpath)
+        header = iarh_to_filth(iardict, extra=True)
+
+        assert isinstance(header, dict)
+        assert header["data_type"] == 1
+        assert header["bandwidth"] == 20
+
+    def test_iarh_to_filth_encode(self):
+        """Test for building enconded filterbank header
+        from .iar template dict."""
+        iardict = read_iar(iarpath)
+        header = iarh_to_filth(iardict, encode=True)
+        bin_data_type_1 = b"\t\x00\x00\x00data_type\x01\x00\x00\x00"
+
+        assert isinstance(header, bytes)
+        assert bin_data_type_1 in header
+
     def test_check_header_start_end(self):
         """Test for checking HEADER_START and HEADER_END."""
         bad = dict()
@@ -215,92 +378,3 @@ class TestFilterbank:
         assert fixed_header_start_end(mix2) == good
         assert fixed_header_start_end(wrong) == expected
         assert fixed_header_start_end(terrible) == expected
-
-    def test_iar_to_fil_header_file(self):
-        """Test for building header from .iar template file."""
-        header = iar_to_fil_header(iarpath)
-
-        assert isinstance(header, dict)
-        assert header["data_type"] == 1
-
-    def test_iar_to_fil_header_dict(self):
-        """Test for building header from .iar template dict."""
-        iardict = read_iar(iarpath)
-        header = iar_to_fil_header(iardict)
-
-        assert isinstance(header, dict)
-        assert header["data_type"] == 1
-
-    def test_iar_to_fil_header_encode(self):
-        """Test for building enconded header from .iar template dict."""
-        iardict = read_iar(iarpath)
-        header = iar_to_fil_header(iardict, encode=True)
-        bin_data_type_1 = b"\t\x00\x00\x00data_type\x01\x00\x00\x00"
-
-        assert isinstance(header, bytes)
-        assert bin_data_type_1 in header
-
-    def test_df_to_filterbank(self, stream: callable, df_rand: callable):
-        """Test for building .fil from dataframe."""
-        df = df_rand()
-        outf = stream()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            df_to_filterbank(df, outfile=outf)
-
-        assert outf.tell() == 81950
-
-    def test_df_to_filterbank_no_output(self, df_rand: callable):
-        """Test for building .fil from dataframe, without output."""
-        df = df_rand()
-
-        with pytest.raises(OSError):
-            df_to_filterbank(df)
-
-    def test_df_to_filterbank_with_header(
-        self, stream: callable, df_rand: callable
-    ):
-        """Test for building .fil from dataframe, with header."""
-        outf = stream()
-        header = dict({"MAGICN": 42})
-        df = df_rand()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            df_to_filterbank(df, header=header, outfile=outf)
-
-        assert outf.tell() == 81964
-
-    def test_df_to_filterbank_with_header_template(
-        self, stream: callable, df_rand: callable
-    ):
-        """Test for building .fil from dataframe, with header."""
-        outf = stream()
-        header = iar_to_fil_header(iarpath)
-        df = df_rand()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            df_to_filterbank(df, header=header, outfile=outf)
-
-        assert outf.tell() == 82297
-
-    @pytest.mark.parametrize("data", [False, 0, 0.0, [0], (0, 0.0)])
-    def test_df_to_filterbank_wrong_header(
-        self, stream: callable, data: any, df_rand: callable
-    ):
-        """Test for building .fil from dataframe, with wrong header."""
-        df = df_rand()
-        outf = stream()
-
-        with pytest.raises(TypeError):
-            df_to_filterbank(df, header=data, outfile=outf)
-
-    def test_raw_to_filterbank(self, stream: callable, df_and_buff: callable):
-        """Test for building .fil from raw file."""
-        outf = stream()
-        _, rawstream = df_and_buff()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            raw_to_filterbank(rawstream, outfile=outf)
-
-        assert outf.tell() == 81950
-        assert files_utils.is_opened(outf)

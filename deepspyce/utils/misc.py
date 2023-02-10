@@ -166,12 +166,99 @@ def _swap(value, fmt: np.dtype = None) -> any:
     return struct.unpack(fmt2, struct.pack(fmt, value))[0]
 
 
+def _all_keys_str(dicc: dict) -> bool:
+    """
+    Checks if all keys of a given dictionary are strings.
+    """
+    return all([isinstance(key, str) for key in dicc.keys()])
+
+
+def _check_key_pos(dicc: dict, key: str, pos: int, verb: bool = False) -> bool:
+    """
+    Dictionary key position check.
+
+    Checks if a given key is at a specific position of a dict's keys index.
+
+    Parameters
+    ----------
+    dicc : dict
+        Dictionary to be checked.
+    key : str
+        Dictionary's key to be checked.
+    pos : int
+        Dictionary key's position to be checked.
+    verb : bool, default value = False
+        Indicates if a warning is raised.
+
+    Return
+    -------
+    result : bool
+        Bool indicating if the given key is in the specified location.
+        None if the key is missing.
+    """
+    keys = list(dicc.keys())
+    loc = keys.index(key) if key in keys else None
+    if loc == pos:
+        return True
+    if loc is None:
+        if verb:
+            warnings.warn(f"{key} is missing in the dictionary.")
+        return None
+    if verb:
+        warnings.warn(f"{key} is not in the {pos} dictionary key.")
+
+    return False
+
+
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
 
 
-def header_to_bytes(
+def check_dict_types(header: dict, key_fmts: dict, warn: bool = True) -> bool:
+    """
+    Dict data types checker.
+
+    Checks that the main entries of a given dictionary
+    have their correct data type, according to a dict of types.
+    Raises a warning for each incorrect data type.
+
+    Parameters
+    ----------
+    header : dict
+        Dictionary to be checked.
+    key_fmts : dict, default value = FILT_HEADER_TYPES
+        Dictionary with key types as values.
+    warn : bool, default value = True
+        Raise a warning for any value type not matching.
+
+    Return
+    ------
+    good : bool
+        Boolean indicating if everything is ok.
+    """
+    for key, value in header.items():
+        if key in key_fmts.keys():
+            dtype = key_fmts.get(key)
+            if (value is not None) and not isinstance(value, dtype):
+                if warn:
+                    warnings.warn(
+                        "WARNING. Key %s value should be type %s"
+                        % (key, dtype)
+                    )
+                good = False
+        # elif (key in ["HEADER_START", "HEADER_END"]) and (value is not None):
+        #     warnings.warn("WARNING. %s key value should be None" %key)
+        #     good = False
+        else:
+            if warn:
+                warnings.warn("WARNING. Unexpected key: %s" % key)
+            good = False
+
+    return good
+
+
+def dict_to_bytes(
     header: dict, key_fmts: dict = dict(), swap: bool = False
 ) -> bytes:
     """
@@ -200,15 +287,16 @@ def header_to_bytes(
     swap = "S" if swap else "|"
     encoded = _my_pack("HEADER_START", str, swap)
     for key, value in kvheader.items():
+        if key in ["HEADER_START", "HEADER_END"]:
+            continue
         fmt = key_fmts.get(key, None)
         encoded += _my_pack(str(key), str, swap) + _my_pack(value, fmt, swap)
-
     encoded += _my_pack("HEADER_END", str, swap)
 
     return encoded
 
 
-def bytes_to_header(
+def bytes_to_dict(
     encoded: bytes, key_fmts: dict = dict(), swap: bool = False
 ) -> dict:
     """
@@ -386,7 +474,7 @@ def dict_to_file(
     overwrite : bool, default value = False
         Indicates if, in case the outfile already exists, it is overwriten.
     kwargs : dict (optional)
-        Parameters to send to the subjacent ``bytes_to_header()`` function.
+        Parameters to send to the subjacent ``bytes_to_dict()`` function.
         Unused if ext is not "filterbank".
     """
     mode = "w"
@@ -398,7 +486,7 @@ def dict_to_file(
         dump = pickle.dumps(dicc)
         mode = "wb"
     elif ext == "filterbank":
-        dump = header_to_bytes(dicc, **kwargs)
+        dump = dict_to_bytes(dicc, **kwargs)
         mode = "wb"
     elif ext == "csv":
         dump = ""
@@ -434,7 +522,7 @@ def dict_from_file(
     renum : bool, default value = True
         Converts all possible numerical values into floats.
     kwargs : dict (optional)
-        Parameters to send to the subjacent ``bytes_to_header()`` function.
+        Parameters to send to the subjacent ``bytes_to_dict()`` function.
         Unused if ext is not "filterbank".
 
     Return
@@ -449,7 +537,7 @@ def dict_from_file(
     elif ext == "pickle":
         dicc = pickle.loads(data)
     elif ext == "filterbank":
-        dicc = bytes_to_header(data, **kwargs)
+        dicc = bytes_to_dict(data, **kwargs)
     elif ext == "csv":
         dicc = dict([line.split(sep) for line in data.splitlines()])
     else:

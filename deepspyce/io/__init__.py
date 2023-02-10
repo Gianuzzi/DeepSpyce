@@ -17,7 +17,7 @@
 # IMPORTS
 # =============================================================================
 
-# from .fits import fits_header, write_fits  # noqa
+from .filterbank import read_filterbank, write_filterbank # noqa
+from .fits import write_fits  # noqa
 from .iar import read_iar, write_iar  # noqa
-from .filterbank import read_filterbank, read_filterbank_data, read_filterbank_header, write_filterbank  # noqa
 from .raw import read_raw, write_raw  # noqa

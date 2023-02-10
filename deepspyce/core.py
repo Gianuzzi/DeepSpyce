@@ -35,11 +35,10 @@ class DeepFrame:
 
     data = attr.ib(
         default=None,
-        validator=attr.validators.instance_of((pd.DataFrame, np.ndarray))
+        validator=attr.validators.instance_of((pd.DataFrame, np.ndarray)),
     )
     header = attr.ib(
-        default=None,
-        validator=attr.validators.instance_of(DeepHeader)
+        default=None, validator=attr.validators.instance_of(DeepHeader)
     )
 
     # plot_cls = attr.ib()
@@ -121,26 +120,7 @@ def mk_deepframe(data: np.ndarray, header: dict = dict()):
     deepframe: ``DeepFrame class`` object.
     """
 
-    return DeepFrame(data=mk_deepdata(data), header=mk_deepheader(header))
-
-
-def mk_deepdata(data: np.ndarray):
-    """
-    DeepData builder.
-
-    This function builds a deepdata object from a data ndarray.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data to be stored.
-
-    Return
-    ------
-    deepdata: ``DeepData class`` object.
-    """
-
-    return DeepData(data=data)
+    return DeepFrame(data=data, header=mk_deepheader(header))
 
 
 def mk_deepheader(header: dict = dict()):

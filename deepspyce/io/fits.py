@@ -20,10 +20,12 @@
 
 import os
 
-import numpy as np
-import pandas as pd
 from astropy.io import fits
 from astropy.table import Table
+
+import numpy as np
+
+import pandas as pd
 
 from .header import fits_header
 
