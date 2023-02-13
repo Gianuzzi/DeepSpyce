@@ -138,37 +138,37 @@ def _my_decode(encoded: bytes, fmt: np.dtype = "U", order: str = "|") -> any:
     return val
 
 
-def _swap(value, fmt: np.dtype = None) -> any:
-    """
-    Bytes swapper.
+# def _swap(value, fmt: np.dtype = None) -> any:
+#     """
+#     Bytes swapper.
 
-    Swaps the bytes of a value and return the new value.
+#     Swaps the bytes of a value and return the new value.
 
-    Parameters
-    ----------
-    value : any
-        Value to be swaped.
-    fmt : numpy dtype, default value = None
-        Data type of the value to be decoded.
-        It can also be a string format.
-        If None, there is an attemp to infer it from the value.
+#     Parameters
+#     ----------
+#     value : any
+#         Value to be swaped.
+#     fmt : numpy dtype, default value = None
+#         Data type of the value to be decoded.
+#         It can also be a string format.
+#         If None, there is an attemp to infer it from the value.
 
-    Return
-    -------
-    swapped : any
-        New value, after swapping bytes.
-    """
-    if fmt is None:
-        fmt = type(value)
-    fmt = _my_fmt(fmt)
-    fmt2 = _my_fmt(fmt, "S")
+#     Return
+#     -------
+#     swapped : any
+#         New value, after swapping bytes.
+#     """
+#     if fmt is None:
+#         fmt = type(value)
+#     fmt = _my_fmt(fmt)
+#     fmt2 = _my_fmt(fmt, "S")
 
-    return struct.unpack(fmt2, struct.pack(fmt, value))[0]
+#     return struct.unpack(fmt2, struct.pack(fmt, value))[0]
 
 
-def _all_keys_str(dicc: dict) -> bool:
-    """Check if all keys of a given dictionary are strings."""
-    return all([isinstance(key, str) for key in dicc.keys()])
+# def _all_keys_str(dicc: dict) -> bool:
+#     """Check if all keys of a given dictionary are strings."""
+#     return all([isinstance(key, str) for key in dicc.keys()])
 
 
 def _check_key_pos(dicc: dict, key: str, pos: int, verb: bool = False) -> bool:
@@ -235,6 +235,7 @@ def check_dict_types(header: dict, key_fmts: dict, warn: bool = True) -> bool:
     good : bool
         Boolean indicating if everything is ok.
     """
+    good = True
     for key, value in header.items():
         if key in key_fmts.keys():
             dtype = key_fmts.get(key)
@@ -323,15 +324,7 @@ def bytes_to_dict(
     header = dict()
     if isinstance(encoded, bytes):
         encoded = io.BytesIO(encoded)
-    swap = "S" if swap else "|"
-    try:
-        key0 = _my_decode(encoded, str, swap)
-    except UnicodeDecodeError as e:
-        print("Error:" + str(e))
-        warnings.warn("WARNING. Trying swapping bytes order...")
-        swap = "|" if swap == "S" else "S"
-        encoded.seek(0)
-        key0 = _my_decode(encoded, str, swap)
+    key0 = _my_decode(encoded, str, swap)
     if key0 != "HEADER_START":
         warnings.warn("WARNING. Header does not start with 'HEADER_START'")
         bad_header = True
