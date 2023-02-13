@@ -11,7 +11,7 @@
 # DOCS
 # ============================================================================
 
-"""This file contains main classes."""
+"""File containing main classes."""
 
 # =============================================================================
 # IMPORTS
@@ -26,6 +26,8 @@ import pandas as pd
 
 @attr.s(frozen=True, repr=False)
 class DeepHeader(dict):
+    """Initialize a dict header to which we can apply function a."""
+
     header = attr.ib(validator=attr.validators.instance_of(dict))
 
 
@@ -103,7 +105,7 @@ class DeepFrame:
 
 def mk_deepframe(data: np.ndarray, header: dict = dict()):
     """
-    DeepFrame builder.
+    Deepframe builder.
 
     This function builds a deepframe object from a data ndarray
     and a dict header.
@@ -119,13 +121,12 @@ def mk_deepframe(data: np.ndarray, header: dict = dict()):
     ------
     deepframe: ``DeepFrame class`` object.
     """
-
     return DeepFrame(data=data, header=mk_deepheader(header))
 
 
 def mk_deepheader(header: dict = dict()):
     """
-    DeepHeader builder.
+    Deepheader builder.
 
     This function builds a deepheader object from a dict header.
 
@@ -138,7 +139,6 @@ def mk_deepheader(header: dict = dict()):
     ------
     deepheader: ``DeepHeader class`` object.
     """
-
     return DeepHeader(header=header)
 
 

@@ -214,7 +214,6 @@ def iarh_to_filth(
     filth : dict
         Dictionary with main .fil header entries.
     """
-
     source_name = iarh.get("Source Name", "None")
     source_ra = iarh.get("Source RA (hhmmss.s)", 0.0)
     source_dec = iarh.get("Source DEC (ddmmss.s)", 0.0)

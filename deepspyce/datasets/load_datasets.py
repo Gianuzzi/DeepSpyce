@@ -53,7 +53,6 @@ def load_raw_1m() -> np.ndarray:
     array : ``numpy.ndarray``
         Numpy ndarray of the aw_1m file data.
     """
-
     return read_raw(PATH / "20201027_133329_1m.raw")
 
 
@@ -68,7 +67,6 @@ def load_raw_test() -> np.ndarray:
     array : ``numpy.ndarray``
         Numpy ndarray of the raw_test file data.
     """
-
     return read_raw(PATH / "20201027_133329_test.raw")
 
 
@@ -83,7 +81,6 @@ def load_csv_test() -> np.ndarray:
     array : ``numpy.ndarray``
         Numpy ndarray of the csv_test file data.
     """
-
     return np.loadtxt(
         PATH / "20201027_133329_test.csv", dtype=">i8", delimiter=","
     )
@@ -100,5 +97,4 @@ def load_iar() -> dict:
     iar : dict
         Dictionary of the template iar file.
     """
-
     return dict_from_file(PATH / "J0437-4715_1_A1.iar")

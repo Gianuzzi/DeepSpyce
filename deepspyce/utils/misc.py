@@ -36,7 +36,7 @@ from .files_utils import is_readable, read_file, write_to_file
 
 def _my_fmt(dtype: np.dtype, order: str = "|"):
     """
-    Simple dtype -> fmt converter.
+    Dtype -> fmt converter.
 
     Converts a given type to string format (fmt)
 
@@ -167,15 +167,13 @@ def _swap(value, fmt: np.dtype = None) -> any:
 
 
 def _all_keys_str(dicc: dict) -> bool:
-    """
-    Checks if all keys of a given dictionary are strings.
-    """
+    """Check if all keys of a given dictionary are strings."""
     return all([isinstance(key, str) for key in dicc.keys()])
 
 
 def _check_key_pos(dicc: dict, key: str, pos: int, verb: bool = False) -> bool:
     """
-    Dictionary key position check.
+    Check dictionary key position.
 
     Checks if a given key is at a specific position of a dict's keys index.
 
@@ -217,7 +215,7 @@ def _check_key_pos(dicc: dict, key: str, pos: int, verb: bool = False) -> bool:
 
 def check_dict_types(header: dict, key_fmts: dict, warn: bool = True) -> bool:
     """
-    Dict data types checker.
+    Check dict data types.
 
     Checks that the main entries of a given dictionary
     have their correct data type, according to a dict of types.
@@ -262,7 +260,7 @@ def dict_to_bytes(
     header: dict, key_fmts: dict = dict(), swap: bool = False
 ) -> bytes:
     """
-    Dictionary (header) encoder.
+    Encode dictionary (header).
 
     Encodes a dictionary, as a filterbank header.
 

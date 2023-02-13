@@ -45,7 +45,6 @@ def is_filelike(fileobj: io.IOBase) -> bool:
     fileobj : file like
         File object.
     """
-
     return issubclass(type(fileobj), io.IOBase)
 
 
@@ -58,7 +57,6 @@ def is_opened(fileobj: io.IOBase) -> bool:
     fileobj : file like
         File object.
     """
-
     attr = not getattr(fileobj, "closed", True)
     return attr() if callable(attr) else attr
 
@@ -72,7 +70,6 @@ def is_writable(fileobj: io.FileIO) -> bool:
     fileobj : file like
         File object.
     """
-
     attr = getattr(fileobj, "writable", False)
     return attr() if callable(attr) else attr
 
@@ -86,7 +83,6 @@ def is_readable(fileobj: io.FileIO) -> bool:
     fileobj : file like
         File object.
     """
-
     attr = getattr(fileobj, "readable", False)
     return attr() if callable(attr) else attr
 
@@ -100,7 +96,6 @@ def file_exists(path_str: os.PathLike) -> bool:
     path_or_stream : str or file like
         Path to the file.
     """
-
     return os.path.isfile(path_str)
 
 

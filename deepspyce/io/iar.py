@@ -45,7 +45,6 @@ def read_iar(path: os.PathLike, **kwargs) -> dict:
     -------
     header : ``DeepHeader class`` object.
     """
-
     return dict_from_file(path, **kwargs)
 
 
